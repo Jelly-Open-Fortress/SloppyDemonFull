@@ -1,0 +1,940 @@
+-- ============================================================================
+-- 1. ENGINE RUNTIME LOGIC (Autokill & ForceField Loops)
+-- ============================================================================
+local RifleAutoKillEnabled = false 
+local DoubleBarrelAutoKillEnabled = false
+local EokaAutoKillEnabled = false
+local ForceFieldActive = false 
+local FRIENDS_LIST = {} 
+
+local Players = game:GetService("Players") 
+local Workspace = game:GetService("Workspace") 
+local LocalPlayer = Players.LocalPlayer 
+
+local function hasLineOfSight(myPos, targetPos, targetChar) 
+    local raycastParams = RaycastParams.new() 
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude 
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar} 
+    raycastParams.IgnoreWater = true 
+    local direction = targetPos - myPos 
+    local raycastResult = Workspace:Raycast(myPos, direction, raycastParams) 
+    return raycastResult == nil 
+end 
+
+local function getNearestPlayer() 
+    local nearestPlayer = nil 
+    local shortestDistance = math.huge 
+    local character = LocalPlayer.Character 
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end 
+    local myPos = character.HumanoidRootPart.Position 
+    
+    for _, player in ipairs(Players:GetPlayers()) do 
+        if player ~= LocalPlayer and not FRIENDS_LIST[player.Name] then 
+            local targetChar = player.Character 
+            if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then 
+                local humanoid = targetChar:FindFirstChildOfClass("Humanoid") 
+                if humanoid then 
+                    local isProtected = targetChar:FindFirstChildOfClass("ForceField") ~= nil 
+                    local isAlive = humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead and targetChar.Parent ~= nil 
+                    
+                    if isAlive and not isProtected then 
+                        local targetPos = targetChar.HumanoidRootPart.Position 
+                        local distance = (targetPos - myPos).Magnitude 
+                        
+                        if distance < shortestDistance then 
+                            if hasLineOfSight(myPos, targetPos, targetChar) then 
+                                shortestDistance = distance 
+                                nearestPlayer = player 
+                            end 
+                        end 
+                    end 
+                end 
+            end 
+        end 
+    end 
+    return nearestPlayer 
+end 
+
+-- Weapon Exploitation Engine (Rifle)
+task.spawn(function() 
+    while true do 
+        if RifleAutoKillEnabled then
+            local character = LocalPlayer.Character 
+            local rifle = character and character:FindFirstChild("Rifle") 
+            local event = rifle and rifle:FindFirstChild("Event") 
+            
+            if event then 
+                local target = getNearestPlayer() 
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then 
+                    local targetCFrame = target.Character.HumanoidRootPart.CFrame 
+                    local args = { "Fire", targetCFrame } 
+                    event:FireServer(unpack(args)) 
+                end 
+            end 
+            task.wait(0) 
+        else
+            task.wait(0.2) 
+        end 
+    end 
+end)
+
+-- Weapon Exploitation Engine (DoubleBarrel)
+task.spawn(function() 
+    while true do 
+        if DoubleBarrelAutoKillEnabled then
+            local character = LocalPlayer.Character 
+            local doubleBarrel = character and character:FindFirstChild("DoubleBarrel") 
+            local bridge = doubleBarrel and doubleBarrel:FindFirstChild("Bridge") 
+            
+            if bridge then 
+                local target = getNearestPlayer() 
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then 
+                    local targetPos = target.Character.HumanoidRootPart.Position 
+                    local args = { "Fire", targetPos } 
+                    bridge:FireServer(unpack(args)) 
+                end 
+            end 
+            task.wait(0) 
+        else
+            task.wait(0.2) 
+        end 
+    end 
+end)
+
+-- Weapon Exploitation Engine (Eoka)
+task.spawn(function() 
+    while true do 
+        if EokaAutoKillEnabled then
+            local character = LocalPlayer.Character 
+            local eoka = character and character:FindFirstChild("Eoka") 
+            
+            if eoka then 
+                local target = getNearestPlayer() 
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then 
+                    -- Get the nil remote event for Eoka
+                    local function getNil(name, class) 
+                        for _, v in next, getnilinstances() do 
+                            if v.ClassName == class and v.Name == name then 
+                                return v 
+                            end 
+                        end 
+                        return nil
+                    end 
+                    
+                    local eoskaEvent = getNil("Fire", "RemoteEvent")
+                    if eoskaEvent then 
+                        local targetCFrame = target.Character.HumanoidRootPart.CFrame 
+                        local args = { "Fire", targetCFrame } 
+                        eoskaEvent:FireServer(unpack(args)) 
+                    end 
+                end 
+            end 
+            task.wait(0) 
+        else
+            task.wait(0.2) 
+        end 
+    end 
+end)
+
+-- Integrated ForceField Spammer Loop
+task.spawn(function()
+    local areaEvent = game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AreaChangeEvent")
+    local args = { "Spawn", false }
+    while true do
+        if ForceFieldActive then
+            areaEvent:FireServer(unpack(args))
+            task.wait(0.1) -- Matches your exact delay request
+        else
+            task.wait(0.3) -- Low-resource sleep mode when toggle is OFF
+        end
+    end
+end)
+
+-- ============================================================================
+-- 2. NATIVE CANVAS & UI BUILD (Instance.new)
+-- ============================================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomCheatMenu"
+ScreenGui.ResetOnSpawn = false
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Main Container Window Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 520, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Top Bar Header
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "  Name | Version"
+Title.Size = UDim2.new(0.8, 0, 1, 0)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
+Title.Parent = Header
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -35, 0, 0)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(240, 70, 70)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 16
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Parent = Header
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+local AccentLine = Instance.new("Frame")
+AccentLine.Size = UDim2.new(1, 0, 0, 2)
+AccentLine.Position = UDim2.new(0, 0, 0, 35)
+AccentLine.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+AccentLine.BorderSizePixel = 0
+AccentLine.Parent = MainFrame
+
+-- Left Sidebar Tab System Panel
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 120, 1, -37)
+Sidebar.Position = UDim2.new(0, 0, 0, 37)
+Sidebar.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = MainFrame
+
+local PageContainer = Instance.new("Frame")
+PageContainer.Size = UDim2.new(1, -135, 1, -47)
+PageContainer.Position = UDim2.new(0, 130, 0, 42)
+PageContainer.BackgroundTransparency = 1
+PageContainer.Parent = MainFrame
+
+-- View containers
+local Page1View = Instance.new("Frame")
+Page1View.Size = UDim2.new(1, 0, 1, 0)
+Page1View.BackgroundTransparency = 1
+Page1View.Visible = true
+Page1View.Parent = PageContainer
+
+local MeleeView = Instance.new("Frame")
+MeleeView.Size = UDim2.new(1, 0, 1, 0)
+MeleeView.BackgroundTransparency = 1
+MeleeView.Visible = false
+MeleeView.Parent = PageContainer
+
+local MoneyFarmView = Instance.new("Frame")
+MoneyFarmView.Size = UDim2.new(1, 0, 1, 0)
+MoneyFarmView.BackgroundTransparency = 1
+MoneyFarmView.Visible = false
+MoneyFarmView.Parent = PageContainer
+
+local MiscView = Instance.new("Frame")
+MiscView.Size = UDim2.new(1, 0, 1, 0)
+MiscView.BackgroundTransparency = 1
+MiscView.Visible = false
+MiscView.Parent = PageContainer
+
+local Page1Btn = Instance.new("TextButton")
+Page1Btn.Size = UDim2.new(1, 0, 0, 40)
+Page1Btn.Text = "Home"
+Page1Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+Page1Btn.Font = Enum.Font.SourceSansBold
+Page1Btn.TextSize = 14
+Page1Btn.BackgroundTransparency = 1
+Page1Btn.BorderSizePixel = 0
+Page1Btn.Parent = Sidebar
+
+local MeleeBtn = Instance.new("TextButton")
+MeleeBtn.Size = UDim2.new(1, 0, 0, 40)
+MeleeBtn.Position = UDim2.new(0, 0, 0, 40)
+MeleeBtn.Text = "Melee"
+MeleeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MeleeBtn.Font = Enum.Font.SourceSansBold
+MeleeBtn.TextSize = 14
+MeleeBtn.BackgroundTransparency = 1
+MeleeBtn.BorderSizePixel = 0
+MeleeBtn.Parent = Sidebar
+
+local MoneyFarmBtn = Instance.new("TextButton")
+MoneyFarmBtn.Size = UDim2.new(1, 0, 0, 40)
+MoneyFarmBtn.Position = UDim2.new(0, 0, 0, 80)
+MoneyFarmBtn.Text = "Money Farm"
+MoneyFarmBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MoneyFarmBtn.Font = Enum.Font.SourceSansBold
+MoneyFarmBtn.TextSize = 14
+MoneyFarmBtn.BackgroundTransparency = 1
+MoneyFarmBtn.BorderSizePixel = 0
+MoneyFarmBtn.Parent = Sidebar
+
+local MiscBtn = Instance.new("TextButton")
+MiscBtn.Size = UDim2.new(1, 0, 0, 40)
+MiscBtn.Position = UDim2.new(0, 0, 0, 120)
+MiscBtn.Text = "Misc"
+MiscBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MiscBtn.Font = Enum.Font.SourceSansBold
+MiscBtn.TextSize = 14
+MiscBtn.BackgroundTransparency = 1
+MiscBtn.BorderSizePixel = 0
+MiscBtn.Parent = Sidebar
+
+local function switchTab(activeView, activeBtn)
+    Page1View.Visible = (activeView == Page1View)
+    MeleeView.Visible = (activeView == MeleeView)
+    MoneyFarmView.Visible = (activeView == MoneyFarmView)
+    MiscView.Visible = (activeView == MiscView)
+    
+    local buttons = {Page1Btn, MeleeBtn, MoneyFarmBtn, MiscBtn}
+    for _, btn in ipairs(buttons) do
+        if btn == activeBtn then
+            btn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+            btn.BackgroundTransparency = 0
+            btn.TextColor3 = Color3.fromRGB(80, 180, 100)
+        else
+            btn.BackgroundTransparency = 1
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+    end
+end
+
+Page1Btn.MouseButton1Click:Connect(function() switchTab(Page1View, Page1Btn) end)
+MeleeBtn.MouseButton1Click:Connect(function() switchTab(MeleeView, MeleeBtn) end)
+MoneyFarmBtn.MouseButton1Click:Connect(function() switchTab(MoneyFarmView, MoneyFarmBtn) end)
+MiscBtn.MouseButton1Click:Connect(function() switchTab(MiscView, MiscBtn) end)
+
+-- ============================================================================
+-- 3. MELEE CONTENT PANEL (Autokill + Dynamic Whitelist)
+-- ============================================================================
+local RifleToggleBox = Instance.new("Frame")
+RifleToggleBox.Size = UDim2.new(1, 0, 0, 45)
+RifleToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+RifleToggleBox.BorderSizePixel = 0
+RifleToggleBox.Parent = MeleeView
+
+local RifleToggleTitle = Instance.new("TextLabel")
+RifleToggleTitle.Text = "  Rifle AutoKill"
+RifleToggleTitle.Size = UDim2.new(0, 180, 1, 0)
+RifleToggleTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+RifleToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+RifleToggleTitle.Font = Enum.Font.SourceSansBold
+RifleToggleTitle.TextSize = 14
+RifleToggleTitle.BackgroundTransparency = 1
+RifleToggleTitle.Parent = RifleToggleBox
+
+local RifleActionBtn = Instance.new("TextButton")
+RifleActionBtn.Size = UDim2.new(0, 65, 0, 28)
+RifleActionBtn.Position = UDim2.new(1, -75, 0.5, -14)
+RifleActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+RifleActionBtn.Text = "OFF"
+RifleActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+RifleActionBtn.Font = Enum.Font.SourceSansBold
+RifleActionBtn.TextSize = 12
+RifleActionBtn.Parent = RifleToggleBox
+
+RifleActionBtn.MouseButton1Click:Connect(function()
+    RifleAutoKillEnabled = not RifleAutoKillEnabled
+    if RifleAutoKillEnabled then
+        RifleActionBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        RifleActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        RifleActionBtn.Text = "ON"
+    else
+        RifleActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        RifleActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        RifleActionBtn.Text = "OFF"
+    end
+end)
+
+-- DoubleBarrel Toggle Box
+local DoubleBarrelToggleBox = Instance.new("Frame")
+DoubleBarrelToggleBox.Size = UDim2.new(1, 0, 0, 45)
+DoubleBarrelToggleBox.Position = UDim2.new(0, 0, 0, 50)
+DoubleBarrelToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+DoubleBarrelToggleBox.BorderSizePixel = 0
+DoubleBarrelToggleBox.Parent = MeleeView
+
+local DoubleBarrelToggleTitle = Instance.new("TextLabel")
+DoubleBarrelToggleTitle.Text = "  DoubleBarrel AutoKill"
+DoubleBarrelToggleTitle.Size = UDim2.new(0, 180, 1, 0)
+DoubleBarrelToggleTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+DoubleBarrelToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+DoubleBarrelToggleTitle.Font = Enum.Font.SourceSansBold
+DoubleBarrelToggleTitle.TextSize = 14
+DoubleBarrelToggleTitle.BackgroundTransparency = 1
+DoubleBarrelToggleTitle.Parent = DoubleBarrelToggleBox
+
+local DoubleBarrelActionBtn = Instance.new("TextButton")
+DoubleBarrelActionBtn.Size = UDim2.new(0, 65, 0, 28)
+DoubleBarrelActionBtn.Position = UDim2.new(1, -75, 0.5, -14)
+DoubleBarrelActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+DoubleBarrelActionBtn.Text = "OFF"
+DoubleBarrelActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+DoubleBarrelActionBtn.Font = Enum.Font.SourceSansBold
+DoubleBarrelActionBtn.TextSize = 12
+DoubleBarrelActionBtn.Parent = DoubleBarrelToggleBox
+
+DoubleBarrelActionBtn.MouseButton1Click:Connect(function()
+    DoubleBarrelAutoKillEnabled = not DoubleBarrelAutoKillEnabled
+    if DoubleBarrelAutoKillEnabled then
+        DoubleBarrelActionBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        DoubleBarrelActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        DoubleBarrelActionBtn.Text = "ON"
+    else
+        DoubleBarrelActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        DoubleBarrelActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        DoubleBarrelActionBtn.Text = "OFF"
+    end
+end)
+
+-- Eoka Toggle Box
+local EokaToggleBox = Instance.new("Frame")
+EokaToggleBox.Size = UDim2.new(1, 0, 0, 45)
+EokaToggleBox.Position = UDim2.new(0, 0, 0, 100)
+EokaToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+EokaToggleBox.BorderSizePixel = 0
+EokaToggleBox.Parent = MeleeView
+
+local EokaToggleTitle = Instance.new("TextLabel")
+EokaToggleTitle.Text = "  Eoka AutoKill"
+EokaToggleTitle.Size = UDim2.new(0, 180, 1, 0)
+EokaToggleTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+EokaToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+EokaToggleTitle.Font = Enum.Font.SourceSansBold
+EokaToggleTitle.TextSize = 14
+EokaToggleTitle.BackgroundTransparency = 1
+EokaToggleTitle.Parent = EokaToggleBox
+
+local EokaActionBtn = Instance.new("TextButton")
+EokaActionBtn.Size = UDim2.new(0, 65, 0, 28)
+EokaActionBtn.Position = UDim2.new(1, -75, 0.5, -14)
+EokaActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+EokaActionBtn.Text = "OFF"
+EokaActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+EokaActionBtn.Font = Enum.Font.SourceSansBold
+EokaActionBtn.TextSize = 12
+EokaActionBtn.Parent = EokaToggleBox
+
+EokaActionBtn.MouseButton1Click:Connect(function()
+    EokaAutoKillEnabled = not EokaAutoKillEnabled
+    if EokaAutoKillEnabled then
+        EokaActionBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        EokaActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        EokaActionBtn.Text = "ON"
+    else
+        EokaActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        EokaActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        EokaActionBtn.Text = "OFF"
+    end
+end)
+
+local ListTitle = Instance.new("TextLabel")
+ListTitle.Text = "Friendly Fire Immunity List:"
+ListTitle.Size = UDim2.new(1, 0, 0, 25)
+ListTitle.Position = UDim2.new(0, 0, 0, 155)
+ListTitle.TextColor3 = Color3.fromRGB(180, 180, 190)
+ListTitle.TextXAlignment = Enum.TextXAlignment.Left
+ListTitle.Font = Enum.Font.SourceSansBold
+ListTitle.TextSize = 13
+ListTitle.BackgroundTransparency = 1
+ListTitle.Parent = MeleeView
+
+local ScrollContainer = Instance.new("ScrollingFrame")
+ScrollContainer.Size = UDim2.new(1, 0, 1, -235)
+ScrollContainer.Position = UDim2.new(0, 0, 0, 185)
+ScrollContainer.BackgroundTransparency = 1
+ScrollContainer.BorderSizePixel = 0
+ScrollContainer.ScrollBarThickness = 4
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollContainer.Parent = MeleeView
+
+local LayoutEngine = Instance.new("UIListLayout")
+LayoutEngine.Padding = UDim.new(0, 6)
+LayoutEngine.SortOrder = Enum.SortOrder.LayoutOrder
+LayoutEngine.Parent = ScrollContainer
+
+local ActionPanel = Instance.new("Frame")
+ActionPanel.Size = UDim2.new(1, 0, 0, 40)
+ActionPanel.Position = UDim2.new(0, 0, 1, -40)
+ActionPanel.BackgroundTransparency = 1
+ActionPanel.Parent = MeleeView
+
+local PlusBtn = Instance.new("TextButton")
+PlusBtn.Size = UDim2.new(0, 45, 1, 0)
+PlusBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+PlusBtn.Text = "+"
+PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlusBtn.Font = Enum.Font.SourceSansBold
+PlusBtn.TextSize = 20
+PlusBtn.Parent = ActionPanel
+
+local MinusBtn = Instance.new("TextButton")
+MinusBtn.Size = UDim2.new(0, 45, 1, 0)
+MinusBtn.Position = UDim2.new(0, 55, 0, 0)
+MinusBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+MinusBtn.Text = "-"
+MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinusBtn.Font = Enum.Font.SourceSansBold
+MinusBtn.TextSize = 20
+MinusBtn.Visible = false 
+MinusBtn.Parent = ActionPanel
+
+local activeTextBoxes = {}
+
+local function rebuildTargetWhitelist()
+    table.clear(FRIENDS_LIST)
+    for _, box in ipairs(activeTextBoxes) do
+        if box.Text ~= "" then FRIENDS_LIST[box.Text] = true end
+    end
+end
+
+local function addNewTextBox()
+    local EntryFrame = Instance.new("Frame")
+    EntryFrame.Size = UDim2.new(1, -8, 0, 36)
+    EntryFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    EntryFrame.BorderSizePixel = 0
+    EntryFrame.Parent = ScrollContainer
+
+    local InputField = Instance.new("TextBox")
+    InputField.Size = UDim2.new(1, -10, 1, 0)
+    InputField.Position = UDim2.new(0, 5, 0, 0)
+    InputField.BackgroundTransparency = 1
+    InputField.TextColor3 = Color3.fromRGB(255, 255, 255)
+    InputField.PlaceholderText = "Type target username here..."
+    InputField.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+    InputField.Text = ""
+    InputField.Font = Enum.Font.SourceSans
+    InputField.TextSize = 14
+    InputField.Parent = EntryFrame
+
+    InputField.FocusLost:Connect(rebuildTargetWhitelist)
+    table.insert(activeTextBoxes, InputField)
+    
+    MinusBtn.Visible = (#activeTextBoxes > 1)
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, LayoutEngine.AbsoluteContentSize.Y + 40)
+end
+
+local function removeLastTextBox()
+    if #activeTextBoxes > 1 then
+        local targetField = activeTextBoxes[#activeTextBoxes]
+        targetField.Parent:Destroy()
+        table.remove(activeTextBoxes, #activeTextBoxes)
+        MinusBtn.Visible = (#activeTextBoxes > 1)
+        rebuildTargetWhitelist()
+        ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, LayoutEngine.AbsoluteContentSize.Y)
+    end
+end
+
+PlusBtn.MouseButton1Click:Connect(addNewTextBox)
+MinusBtn.MouseButton1Click:Connect(removeLastTextBox)
+addNewTextBox()
+
+-- ============================================================================
+-- 4. MONEY FARM PANEL
+-- ============================================================================
+local FarmButton = Instance.new("TextButton")
+FarmButton.Size = UDim2.new(1, -10, 0, 50)
+FarmButton.Position = UDim2.new(0, 5, 0, 10)
+FarmButton.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+FarmButton.Text = "Start Money Farm"
+FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FarmButton.Font = Enum.Font.SourceSansBold
+FarmButton.TextSize = 16
+FarmButton.BorderSizePixel = 0
+FarmButton.Parent = MoneyFarmView
+
+local WarningText = Instance.new("TextLabel")
+WarningText.Size = UDim2.new(1, -10, 0, 60)
+WarningText.Position = UDim2.new(0, 5, 0, 70)
+WarningText.Text = "⚠️ Warning: You cannot disable this tool once started. If you wish to stop the exploit loop, you must rejoin the server to fix."
+WarningText.TextColor3 = Color3.fromRGB(230, 90, 90)
+WarningText.Font = Enum.Font.SourceSansItalic
+WarningText.TextSize = 14
+WarningText.TextWrapped = true
+WarningText.TextYAlignment = Enum.TextYAlignment.Top
+WarningText.BackgroundTransparency = 1
+WarningText.Parent = MoneyFarmView
+
+FarmButton.MouseButton1Click:Connect(function()
+    FarmButton.Active = false
+    FarmButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+    FarmButton.Text = "Money Farm Running..."
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Jelly-Open-Fortress/SloppyDemon/master/Source"))()
+end)
+
+-- ============================================================================
+-- 5. MISC CONTENT PANEL (ForceField Toggle Integration)
+-- ============================================================================
+local MiscToggleBox = Instance.new("Frame")
+MiscToggleBox.Size = UDim2.new(1, 0, 0, 45)
+MiscToggleBox.Position = UDim2.new(0, 0, 0, 5)
+MiscToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+MiscToggleBox.BorderSizePixel = 0
+MiscToggleBox.Parent = MiscView
+
+local MiscToggleTitle = Instance.new("TextLabel")
+MiscToggleTitle.Text = "  ForceField"
+MiscToggleTitle.Size = UDim2.new(0, 180, 1, 0)
+MiscToggleTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+MiscToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+MiscToggleTitle.Font = Enum.Font.SourceSansBold
+MiscToggleTitle.TextSize = 14
+MiscToggleTitle.BackgroundTransparency = 1
+MiscToggleTitle.Parent = MiscToggleBox
+
+local MiscActionBtn = Instance.new("TextButton")
+MiscActionBtn.Size = UDim2.new(0, 65, 0, 28)
+MiscActionBtn.Position = UDim2.new(1, -75, 0.5, -14)
+MiscActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+MiscActionBtn.Text = "OFF"
+MiscActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+MiscActionBtn.Font = Enum.Font.SourceSansBold
+MiscActionBtn.TextSize = 12
+MiscActionBtn.Parent = MiscToggleBox
+
+MiscActionBtn.MouseButton1Click:Connect(function()
+    ForceFieldActive = not ForceFieldActive
+    if ForceFieldActive then
+        MiscActionBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        MiscActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        MiscActionBtn.Text = "ON"
+    else
+        MiscActionBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        MiscActionBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        MiscActionBtn.Text = "OFF"
+    end
+end)
+
+-- ============================================================================
+-- UNLOCK ALL RECIPES TOGGLE
+-- ============================================================================
+local UnlockRecipesToggleBox = Instance.new("Frame")
+UnlockRecipesToggleBox.Size = UDim2.new(1, 0, 0, 45)
+UnlockRecipesToggleBox.Position = UDim2.new(0, 0, 0, 50)
+UnlockRecipesToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+UnlockRecipesToggleBox.BorderSizePixel = 0
+UnlockRecipesToggleBox.Parent = MiscView
+
+local UnlockRecipesTitle = Instance.new("TextLabel")
+UnlockRecipesTitle.Text = "  Unlock All Recipes"
+UnlockRecipesTitle.Size = UDim2.new(0, 180, 1, 0)
+UnlockRecipesTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+UnlockRecipesTitle.TextXAlignment = Enum.TextXAlignment.Left
+UnlockRecipesTitle.Font = Enum.Font.SourceSansBold
+UnlockRecipesTitle.TextSize = 14
+UnlockRecipesTitle.BackgroundTransparency = 1
+UnlockRecipesTitle.Parent = UnlockRecipesToggleBox
+
+local UnlockRecipesBtn = Instance.new("TextButton")
+UnlockRecipesBtn.Size = UDim2.new(0, 65, 0, 28)
+UnlockRecipesBtn.Position = UDim2.new(1, -75, 0.5, -14)
+UnlockRecipesBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+UnlockRecipesBtn.Text = "OFF"
+UnlockRecipesBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+UnlockRecipesBtn.Font = Enum.Font.SourceSansBold
+UnlockRecipesBtn.TextSize = 12
+UnlockRecipesBtn.Parent = UnlockRecipesToggleBox
+
+-- Unlock Recipes state
+local UnlockRecipesActive = false
+local SavedRecipeStates = {}
+
+UnlockRecipesBtn.MouseButton1Click:Connect(function()
+    UnlockRecipesActive = not UnlockRecipesActive
+    
+    local unlockedItemsFolder = game:GetService("Players").LocalPlayer:FindFirstChild("UnlockedItems")
+    
+    if not unlockedItemsFolder then
+        print("[Unlock Recipes] UnlockedItems folder not found!")
+        return
+    end
+    
+    if UnlockRecipesActive then
+        -- Save current state
+        SavedRecipeStates = {}
+        for _, item in ipairs(unlockedItemsFolder:GetChildren()) do
+            if item:IsA("BoolValue") then
+                SavedRecipeStates[item.Name] = item.Value
+            end
+        end
+        
+        -- Unlock all recipes
+        for _, item in ipairs(unlockedItemsFolder:GetChildren()) do
+            if item:IsA("BoolValue") then
+                item.Value = true
+            end
+        end
+        
+        UnlockRecipesBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        UnlockRecipesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        UnlockRecipesBtn.Text = "ON"
+        print("[Unlock Recipes] All recipes unlocked! Saved " .. #SavedRecipeStates .. " items.")
+    else
+        -- Restore saved state
+        for itemName, savedValue in pairs(SavedRecipeStates) do
+            local item = unlockedItemsFolder:FindFirstChild(itemName)
+            if item and item:IsA("BoolValue") then
+                item.Value = savedValue
+            end
+        end
+        
+        UnlockRecipesBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        UnlockRecipesBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        UnlockRecipesBtn.Text = "OFF"
+        print("[Unlock Recipes] Recipes restored to previous state.")
+        SavedRecipeStates = {}
+    end
+end)
+
+-- ============================================================================
+-- 6. SHOP FISH PANEL (Fishing Configuration)
+-- ============================================================================
+local FishingConfigBox = Instance.new("Frame")
+FishingConfigBox.Size = UDim2.new(1, 0, 0, 180)
+FishingConfigBox.Position = UDim2.new(0, 0, 0, 105)
+FishingConfigBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+FishingConfigBox.BorderSizePixel = 0
+FishingConfigBox.Parent = MiscView
+
+local FishingTitle = Instance.new("TextLabel")
+FishingTitle.Text = "  Shop Fish Configuration"
+FishingTitle.Size = UDim2.new(1, 0, 0, 25)
+FishingTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+FishingTitle.TextXAlignment = Enum.TextXAlignment.Left
+FishingTitle.Font = Enum.Font.SourceSansBold
+FishingTitle.TextSize = 13
+FishingTitle.BackgroundTransparency = 1
+FishingTitle.Parent = FishingConfigBox
+
+-- Textbox 1: TARGET_TEXT
+local TargetTextLabel = Instance.new("TextLabel")
+TargetTextLabel.Text = "TARGET_TEXT:"
+TargetTextLabel.Size = UDim2.new(0, 90, 0, 20)
+TargetTextLabel.Position = UDim2.new(0, 10, 0, 30)
+TargetTextLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+TargetTextLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetTextLabel.Font = Enum.Font.SourceSans
+TargetTextLabel.TextSize = 12
+TargetTextLabel.BackgroundTransparency = 1
+TargetTextLabel.Parent = FishingConfigBox
+
+local TargetTextBox = Instance.new("TextBox")
+TargetTextBox.Size = UDim2.new(0, 200, 0, 22)
+TargetTextBox.Position = UDim2.new(0, 110, 0, 30)
+TargetTextBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+TargetTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetTextBox.PlaceholderText = "Filament"
+TargetTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+TargetTextBox.Text = "Filament"
+TargetTextBox.Font = Enum.Font.SourceSans
+TargetTextBox.TextSize = 12
+TargetTextBox.Parent = FishingConfigBox
+
+-- Textbox 2: STAY_DURATION
+local StayDurationLabel = Instance.new("TextLabel")
+StayDurationLabel.Text = "STAY_DURATION:"
+StayDurationLabel.Size = UDim2.new(0, 90, 0, 20)
+StayDurationLabel.Position = UDim2.new(0, 10, 0, 58)
+StayDurationLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+StayDurationLabel.TextXAlignment = Enum.TextXAlignment.Left
+StayDurationLabel.Font = Enum.Font.SourceSans
+StayDurationLabel.TextSize = 12
+StayDurationLabel.BackgroundTransparency = 1
+StayDurationLabel.Parent = FishingConfigBox
+
+local StayDurationBox = Instance.new("TextBox")
+StayDurationBox.Size = UDim2.new(0, 200, 0, 22)
+StayDurationBox.Position = UDim2.new(0, 110, 0, 58)
+StayDurationBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+StayDurationBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+StayDurationBox.PlaceholderText = "1"
+StayDurationBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+StayDurationBox.Text = "1"
+StayDurationBox.Font = Enum.Font.SourceSans
+StayDurationBox.TextSize = 12
+StayDurationBox.Parent = FishingConfigBox
+
+-- Textbox 3: SPAM_INTERVAL
+local SpamIntervalLabel = Instance.new("TextLabel")
+SpamIntervalLabel.Text = "SPAM_INTERVAL:"
+SpamIntervalLabel.Size = UDim2.new(0, 90, 0, 20)
+SpamIntervalLabel.Position = UDim2.new(0, 10, 0, 86)
+SpamIntervalLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+SpamIntervalLabel.TextXAlignment = Enum.TextXAlignment.Left
+SpamIntervalLabel.Font = Enum.Font.SourceSans
+SpamIntervalLabel.TextSize = 12
+SpamIntervalLabel.BackgroundTransparency = 1
+SpamIntervalLabel.Parent = FishingConfigBox
+
+local SpamIntervalBox = Instance.new("TextBox")
+SpamIntervalBox.Size = UDim2.new(0, 200, 0, 22)
+SpamIntervalBox.Position = UDim2.new(0, 110, 0, 86)
+SpamIntervalBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+SpamIntervalBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpamIntervalBox.PlaceholderText = "0.07"
+SpamIntervalBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+SpamIntervalBox.Text = "0.07"
+SpamIntervalBox.Font = Enum.Font.SourceSans
+SpamIntervalBox.TextSize = 12
+SpamIntervalBox.Parent = FishingConfigBox
+
+-- Start Button
+local StartFishBtn = Instance.new("TextButton")
+StartFishBtn.Size = UDim2.new(0, 200, 0, 30)
+StartFishBtn.Position = UDim2.new(0, 10, 0, 114)
+StartFishBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+StartFishBtn.Text = "Start Shop Fish"
+StartFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartFishBtn.Font = Enum.Font.SourceSansBold
+StartFishBtn.TextSize = 12
+StartFishBtn.BorderSizePixel = 0
+StartFishBtn.Parent = FishingConfigBox
+
+-- Abort Instructions
+local AbortText = Instance.new("TextLabel")
+AbortText.Text = "Press N to Abort"
+AbortText.Size = UDim2.new(1, -20, 0, 20)
+AbortText.Position = UDim2.new(0, 10, 1, -25)
+AbortText.TextColor3 = Color3.fromRGB(230, 150, 80)
+AbortText.TextXAlignment = Enum.TextXAlignment.Center
+AbortText.Font = Enum.Font.SourceSansItalic
+AbortText.TextSize = 11
+AbortText.BackgroundTransparency = 1
+AbortText.Parent = FishingConfigBox
+
+-- Fishing script state
+local FishingActive = false
+local textConnection = nil
+local keyConnection = nil
+local isUnloaded = false
+local originalPosition = nil
+local isSpamming = false
+
+-- Helper to safely get the current position of your character
+local function getMyPosition()
+	local character = LocalPlayer.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	return rootPart and rootPart.Position
+end
+
+-- Teleport helper function
+local function teleportMe(position)
+	if not position then return end
+	local character = LocalPlayer.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	if rootPart then
+		rootPart.CFrame = CFrame.new(position)
+	end
+end
+
+-- Cleanup function to return you back and fully unload the script
+local function unloadFishingScript(reason)
+	if isUnloaded then return end
+	isUnloaded = true
+	isSpamming = false
+	FishingActive = false
+	
+	-- Return to the original position before unloading
+	if originalPosition then
+		teleportMe(originalPosition)
+	end
+	
+	-- Disconnect listeners to prevent memory leaks
+	if textConnection then textConnection:Disconnect() end
+	if keyConnection then keyConnection:Disconnect() end
+	
+	-- Reset button UI
+	StartFishBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+	StartFishBtn.Text = "Start Shop Fish"
+	StartFishBtn.Active = true
+end
+
+-- Key spamming loop function
+local function startSpamming(spamInterval)
+	isSpamming = true
+	
+	task.spawn(function()
+		while isSpamming and not isUnloaded do
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+			task.wait()
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+			task.wait(spamInterval)
+		end
+	end)
+end
+
+-- Main fishing logic function
+local function checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+	if isUnloaded then return end
+	
+	if not originalPosition then
+		originalPosition = getMyPosition()
+	end
+	
+	local prompt = workspace:WaitForChild("Interactables")
+	                        :WaitForChild("HoboStore")
+	                        :WaitForChild("BuyButton")
+	                        :WaitForChild("Attachment")
+	                        :WaitForChild("Prompt")
+	
+	-- Teleport Coordinates
+	local MATCH_POS = Vector3.new(59, -21, 4)
+	local NO_MATCH_POS = Vector3.new(-11, 3, 55)
+	
+	if prompt.ObjectText == TARGET_TEXT then
+		teleportMe(MATCH_POS)
+		startSpamming(SPAM_INTERVAL)
+		task.wait(STAY_DURATION)
+		unloadFishingScript("Completed execution (Target found and timer finished)")
+	else
+		isSpamming = false
+		teleportMe(NO_MATCH_POS)
+	end
+end
+
+StartFishBtn.MouseButton1Click:Connect(function()
+	if FishingActive then return end
+	FishingActive = true
+	isUnloaded = false
+	isSpamming = false
+	originalPosition = nil
+	
+	StartFishBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+	StartFishBtn.Text = "Fishing..."
+	StartFishBtn.Active = false
+	
+	-- Get values from textboxes
+	local TARGET_TEXT = TargetTextBox.Text ~= "" and TargetTextBox.Text or "Filament"
+	local STAY_DURATION = tonumber(StayDurationBox.Text) or 1
+	local SPAM_INTERVAL = tonumber(SpamIntervalBox.Text) or 0.07
+	
+	-- Listen for changes to ObjectText
+	local prompt = workspace:WaitForChild("Interactables")
+	                        :WaitForChild("HoboStore")
+	                        :WaitForChild("BuyButton")
+	                        :WaitForChild("Attachment")
+	                        :WaitForChild("Prompt")
+	
+	textConnection = prompt:GetPropertyChangedSignal("ObjectText"):Connect(function()
+		checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+	end)
+	
+	-- Run initial check immediately upon start
+	checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+end)
+
+-- Abort fishing with N key
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService2 = game:GetService("UserInputService")
+UserInputService2.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.N and FishingActive then
+		unloadFishingScript("User pressed 'N' key")
+	end
+end)
