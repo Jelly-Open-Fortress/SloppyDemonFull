@@ -1,3 +1,74 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IntroGui"
+screenGui.IgnoreGuiInset = true
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Create Blur Effect
+local lighting = game:GetService("Lighting")
+local blur = Instance.new("BlurEffect")
+blur.Size = 24
+blur.Parent = lighting
+
+-- Create Image Label (The Logo) - FIXED TO SHOW
+local imageLabel = Instance.new("ImageLabel")
+imageLabel.Size = UDim2.new(0, 400, 0, 400) 
+imageLabel.Position = UDim2.new(0.5,0,0.5,0)
+imageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+imageLabel.BackgroundTransparency = 1
+imageLabel.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+imageLabel.Image = "rbxassetid://103943835220721"
+imageLabel.ScaleType = Enum.ScaleType.Fit
+imageLabel.ImageTransparency = 0
+imageLabel.Parent = screenGui
+
+-- Wait for 3 seconds
+task.wait(3)
+
+-- Smooth fade out animations
+local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+local blurTween = TweenService:Create(blur, tweenInfo, {Size = 0})
+local imageTween = TweenService:Create(imageLabel, tweenInfo, {ImageTransparency = 1})
+
+blurTween:Play()
+imageTween:Play()
+
+-- Clean up elements after fade completes
+imageTween.Completed:Connect(function()
+	screenGui:Destroy()
+	blur:Destroy()
+end)
+
+task.wait(0)
+
+-- Savior stuff your welcome
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+local targetY = -432
+local teleportDestination = Vector3.new(0, 6, 55)
+
+-- Function that constantly checks the player's position
+RunService.Heartbeat:Connect(function()
+    local character = localPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = character.HumanoidRootPart
+        
+        -- Check if the player is below the allowed Y-level
+        if rootPart.Position.Y < targetY then
+            -- Teleport the player safely using PivotTo
+            character:PivotTo(CFrame.new(teleportDestination))
+        end
+    end
+end)
+
+
 -- ============================================================================
 -- 1. ENGINE RUNTIME LOGIC (Autokill & ForceField Loops)
 -- ============================================================================
@@ -6,6 +77,10 @@ local DoubleBarrelAutoKillEnabled = false
 local EokaAutoKillEnabled = false
 local ForceFieldActive = false 
 local FRIENDS_LIST = {} 
+
+-- Multi-Select Configuration Tables
+local SELECTED_FISHING_ITEMS = { ["Filament"] = true } -- Defaults to Filament
+local SELECTED_NOTIF_ITEMS = { ["Filament"] = true }    -- Defaults to Filament
 
 local Players = game:GetService("Players") 
 local Workspace = game:GetService("Workspace") 
@@ -111,7 +186,6 @@ task.spawn(function()
             if eoka then 
                 local target = getNearestPlayer() 
                 if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then 
-                    -- Get the nil remote event for Eoka
                     local function getNil(name, class) 
                         for _, v in next, getnilinstances() do 
                             if v.ClassName == class and v.Name == name then 
@@ -143,9 +217,9 @@ task.spawn(function()
     while true do
         if ForceFieldActive then
             areaEvent:FireServer(unpack(args))
-            task.wait(0.1) -- Matches your exact delay request
+            task.wait(0.1) 
         else
-            task.wait(0.3) -- Low-resource sleep mode when toggle is OFF
+            task.wait(0.3) 
         end
     end
 end)
@@ -159,7 +233,6 @@ ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
--- Main Container Window Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 520, 0, 340)
 MainFrame.Position = UDim2.new(0.5, -260, 0.5, -170)
@@ -169,7 +242,6 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Top Bar Header
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 35)
 Header.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
@@ -177,7 +249,7 @@ Header.BorderSizePixel = 0
 Header.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Text = "  Name | Version"
+Title.Text = "  Prevent"
 Title.Size = UDim2.new(0.8, 0, 1, 0)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -204,7 +276,6 @@ AccentLine.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
 AccentLine.BorderSizePixel = 0
 AccentLine.Parent = MainFrame
 
--- Left Sidebar Tab System Panel
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 120, 1, -37)
 Sidebar.Position = UDim2.new(0, 0, 0, 37)
@@ -218,30 +289,93 @@ PageContainer.Position = UDim2.new(0, 130, 0, 42)
 PageContainer.BackgroundTransparency = 1
 PageContainer.Parent = MainFrame
 
--- View containers
+local Page1View = Instance.new("ScrollingFrame")
+Page1View.Size = UDim2.new(1, 0, 1, 0)
+Page1View.BackgroundTransparency = 1
+Page1View.Visible = true
+Page1View.BorderSizePixel = 0
+Page1View.ScrollBarThickness = 4
+Page1View.CanvasSize = UDim2.new(0, 0, 0, 100)
+Page1View.Parent = PageContainer
+
+local MeleeView = Instance.new("ScrollingFrame")
+MeleeView.Size = UDim2.new(1, 0, 1, 0)
+MeleeView.BackgroundTransparency = 1
+MeleeView.Visible = false
+MeleeView.BorderSizePixel = 0
+MeleeView.ScrollBarThickness = 4
+MeleeView.CanvasSize = UDim2.new(0, 0, 0, 300)
+MeleeView.Parent = PageContainer
+
+local MoneyFarmView = Instance.new("ScrollingFrame")
+MoneyFarmView.Size = UDim2.new(1, 0, 1, 0)
+MoneyFarmView.BackgroundTransparency = 1
+MoneyFarmView.Visible = false
+MoneyFarmView.BorderSizePixel = 0
+MoneyFarmView.ScrollBarThickness = 4
+MoneyFarmView.CanvasSize = UDim2.new(0, 0, 0, 200)
+MoneyFarmView.Parent = PageContainer
+
+local MiscView = Instance.new("ScrollingFrame")
+MiscView.Size = UDim2.new(1, 0, 1, 0)
+MiscView.BackgroundTransparency = 1
+MiscView.Visible = false
+MiscView.BorderSizePixel = 0
+MiscView.ScrollBarThickness = 4
+MiscView.CanvasSize = UDim2.new(0, 0, 0, 500)
+MiscView.Parent = PageContainer
+
+local function addListLayoutToPage(page, initialSize)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = page
+    
+    layout.Changed:Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    end)
+end
+
+addListLayoutToPage(Page1View, 100)
+addListLayoutToPage(MeleeView, 300)
+addListLayoutToPage(MoneyFarmView, 200)
+addListLayoutToPage(MiscView, 500)
+
 local Page1View = Instance.new("Frame")
 Page1View.Size = UDim2.new(1, 0, 1, 0)
 Page1View.BackgroundTransparency = 1
 Page1View.Visible = true
 Page1View.Parent = PageContainer
 
-local MeleeView = Instance.new("Frame")
-MeleeView.Size = UDim2.new(1, 0, 1, 0)
-MeleeView.BackgroundTransparency = 1
-MeleeView.Visible = false
-MeleeView.Parent = PageContainer
+local BrandingContainer = Instance.new("Frame")
+BrandingContainer.Size = UDim2.new(1, -10, 0, 185)
+BrandingContainer.BackgroundTransparency = 1
+BrandingContainer.LayoutOrder = 0 
+BrandingContainer.Parent = Page1View
 
-local MoneyFarmView = Instance.new("Frame")
-MoneyFarmView.Size = UDim2.new(1, 0, 1, 0)
-MoneyFarmView.BackgroundTransparency = 1
-MoneyFarmView.Visible = false
-MoneyFarmView.Parent = PageContainer
+local PreventLogo = Instance.new("ImageLabel")
+PreventLogo.Name = "PreventLogo"
+PreventLogo.Size = UDim2.new(0, 350, 0, 350) 
+PreventLogo.Position = UDim2.new(0.5, 0, -0.5, 0) 
+PreventLogo.AnchorPoint = Vector2.new(0.5, 0) 
+PreventLogo.BackgroundTransparency = 1
+PreventLogo.Image = "rbxassetid://122989578583459" 
+PreventLogo.ScaleType = Enum.ScaleType.Fit
+PreventLogo.Parent = BrandingContainer
 
-local MiscView = Instance.new("Frame")
-MiscView.Size = UDim2.new(1, 0, 1, 0)
-MiscView.BackgroundTransparency = 1
-MiscView.Visible = false
-MiscView.Parent = PageContainer
+local LogoSubtitle = Instance.new("TextLabel")
+LogoSubtitle.Name = "LogoSubtitle"
+LogoSubtitle.Size = UDim2.new(1, 0, 0, 35)
+LogoSubtitle.Position = UDim2.new(0, 0, 0, 145) 
+LogoSubtitle.BackgroundTransparency = 1
+LogoSubtitle.Text = "Welcome to Prevent v1.0\nYoooo we up!"
+LogoSubtitle.TextColor3 = Color3.fromRGB(160, 160, 170)
+LogoSubtitle.Font = Enum.Font.SourceSansItalic
+LogoSubtitle.TextSize = 13
+LogoSubtitle.TextWrapped = true
+LogoSubtitle.TextYAlignment = Enum.TextYAlignment.Top
+LogoSubtitle.Parent = BrandingContainer
+
 
 local Page1Btn = Instance.new("TextButton")
 Page1Btn.Size = UDim2.new(1, 0, 0, 40)
@@ -314,7 +448,8 @@ MiscBtn.MouseButton1Click:Connect(function() switchTab(MiscView, MiscBtn) end)
 -- 3. MELEE CONTENT PANEL (Autokill + Dynamic Whitelist)
 -- ============================================================================
 local RifleToggleBox = Instance.new("Frame")
-RifleToggleBox.Size = UDim2.new(1, 0, 0, 45)
+RifleToggleBox.Size = UDim2.new(1, -10, 0, 45)
+RifleToggleBox.LayoutOrder = 1
 RifleToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 RifleToggleBox.BorderSizePixel = 0
 RifleToggleBox.Parent = MeleeView
@@ -352,10 +487,9 @@ RifleActionBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- DoubleBarrel Toggle Box
 local DoubleBarrelToggleBox = Instance.new("Frame")
-DoubleBarrelToggleBox.Size = UDim2.new(1, 0, 0, 45)
-DoubleBarrelToggleBox.Position = UDim2.new(0, 0, 0, 50)
+DoubleBarrelToggleBox.Size = UDim2.new(1, -10, 0, 45)
+DoubleBarrelToggleBox.LayoutOrder = 2
 DoubleBarrelToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 DoubleBarrelToggleBox.BorderSizePixel = 0
 DoubleBarrelToggleBox.Parent = MeleeView
@@ -393,10 +527,9 @@ DoubleBarrelActionBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Eoka Toggle Box
 local EokaToggleBox = Instance.new("Frame")
-EokaToggleBox.Size = UDim2.new(1, 0, 0, 45)
-EokaToggleBox.Position = UDim2.new(0, 0, 0, 100)
+EokaToggleBox.Size = UDim2.new(1, -10, 0, 45)
+EokaToggleBox.LayoutOrder = 3
 EokaToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 EokaToggleBox.BorderSizePixel = 0
 EokaToggleBox.Parent = MeleeView
@@ -436,8 +569,8 @@ end)
 
 local ListTitle = Instance.new("TextLabel")
 ListTitle.Text = "Friendly Fire Immunity List:"
-ListTitle.Size = UDim2.new(1, 0, 0, 25)
-ListTitle.Position = UDim2.new(0, 0, 0, 155)
+ListTitle.Size = UDim2.new(1, -10, 0, 25)
+ListTitle.LayoutOrder = 4
 ListTitle.TextColor3 = Color3.fromRGB(180, 180, 190)
 ListTitle.TextXAlignment = Enum.TextXAlignment.Left
 ListTitle.Font = Enum.Font.SourceSansBold
@@ -446,8 +579,8 @@ ListTitle.BackgroundTransparency = 1
 ListTitle.Parent = MeleeView
 
 local ScrollContainer = Instance.new("ScrollingFrame")
-ScrollContainer.Size = UDim2.new(1, 0, 1, -235)
-ScrollContainer.Position = UDim2.new(0, 0, 0, 185)
+ScrollContainer.Size = UDim2.new(1, -10, 0, 150)
+ScrollContainer.LayoutOrder = 5
 ScrollContainer.BackgroundTransparency = 1
 ScrollContainer.BorderSizePixel = 0
 ScrollContainer.ScrollBarThickness = 4
@@ -460,8 +593,8 @@ LayoutEngine.SortOrder = Enum.SortOrder.LayoutOrder
 LayoutEngine.Parent = ScrollContainer
 
 local ActionPanel = Instance.new("Frame")
-ActionPanel.Size = UDim2.new(1, 0, 0, 40)
-ActionPanel.Position = UDim2.new(0, 0, 1, -40)
+ActionPanel.Size = UDim2.new(1, -10, 0, 40)
+ActionPanel.LayoutOrder = 6
 ActionPanel.BackgroundTransparency = 1
 ActionPanel.Parent = MeleeView
 
@@ -540,7 +673,7 @@ addNewTextBox()
 -- ============================================================================
 local FarmButton = Instance.new("TextButton")
 FarmButton.Size = UDim2.new(1, -10, 0, 50)
-FarmButton.Position = UDim2.new(0, 5, 0, 10)
+FarmButton.LayoutOrder = 1
 FarmButton.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
 FarmButton.Text = "Start Money Farm"
 FarmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -551,7 +684,7 @@ FarmButton.Parent = MoneyFarmView
 
 local WarningText = Instance.new("TextLabel")
 WarningText.Size = UDim2.new(1, -10, 0, 60)
-WarningText.Position = UDim2.new(0, 5, 0, 70)
+WarningText.LayoutOrder = 2
 WarningText.Text = "⚠️ Warning: You cannot disable this tool once started. If you wish to stop the exploit loop, you must rejoin the server to fix."
 WarningText.TextColor3 = Color3.fromRGB(230, 90, 90)
 WarningText.Font = Enum.Font.SourceSansItalic
@@ -572,8 +705,8 @@ end)
 -- 5. MISC CONTENT PANEL (ForceField Toggle Integration)
 -- ============================================================================
 local MiscToggleBox = Instance.new("Frame")
-MiscToggleBox.Size = UDim2.new(1, 0, 0, 45)
-MiscToggleBox.Position = UDim2.new(0, 0, 0, 5)
+MiscToggleBox.Size = UDim2.new(1, -10, 0, 45)
+MiscToggleBox.LayoutOrder = 1
 MiscToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 MiscToggleBox.BorderSizePixel = 0
 MiscToggleBox.Parent = MiscView
@@ -615,8 +748,8 @@ end)
 -- UNLOCK ALL RECIPES TOGGLE
 -- ============================================================================
 local UnlockRecipesToggleBox = Instance.new("Frame")
-UnlockRecipesToggleBox.Size = UDim2.new(1, 0, 0, 45)
-UnlockRecipesToggleBox.Position = UDim2.new(0, 0, 0, 50)
+UnlockRecipesToggleBox.Size = UDim2.new(1, -10, 0, 45)
+UnlockRecipesToggleBox.LayoutOrder = 2
 UnlockRecipesToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 UnlockRecipesToggleBox.BorderSizePixel = 0
 UnlockRecipesToggleBox.Parent = MiscView
@@ -641,7 +774,6 @@ UnlockRecipesBtn.Font = Enum.Font.SourceSansBold
 UnlockRecipesBtn.TextSize = 12
 UnlockRecipesBtn.Parent = UnlockRecipesToggleBox
 
--- Unlock Recipes state
 local UnlockRecipesActive = false
 local SavedRecipeStates = {}
 
@@ -649,55 +781,57 @@ UnlockRecipesBtn.MouseButton1Click:Connect(function()
     UnlockRecipesActive = not UnlockRecipesActive
     
     local unlockedItemsFolder = game:GetService("Players").LocalPlayer:FindFirstChild("UnlockedItems")
-    
-    if not unlockedItemsFolder then
-        print("[Unlock Recipes] UnlockedItems folder not found!")
-        return
-    end
+    if not unlockedItemsFolder then return end
     
     if UnlockRecipesActive then
-        -- Save current state
         SavedRecipeStates = {}
         for _, item in ipairs(unlockedItemsFolder:GetChildren()) do
             if item:IsA("BoolValue") then
                 SavedRecipeStates[item.Name] = item.Value
-            end
-        end
-        
-        -- Unlock all recipes
-        for _, item in ipairs(unlockedItemsFolder:GetChildren()) do
-            if item:IsA("BoolValue") then
                 item.Value = true
             end
         end
-        
         UnlockRecipesBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
         UnlockRecipesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         UnlockRecipesBtn.Text = "ON"
-        print("[Unlock Recipes] All recipes unlocked! Saved " .. #SavedRecipeStates .. " items.")
     else
-        -- Restore saved state
         for itemName, savedValue in pairs(SavedRecipeStates) do
             local item = unlockedItemsFolder:FindFirstChild(itemName)
             if item and item:IsA("BoolValue") then
                 item.Value = savedValue
             end
         end
-        
         UnlockRecipesBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
         UnlockRecipesBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
         UnlockRecipesBtn.Text = "OFF"
-        print("[Unlock Recipes] Recipes restored to previous state.")
         SavedRecipeStates = {}
     end
 end)
 
 -- ============================================================================
--- 6. SHOP FISH PANEL (Fishing Configuration)
+-- GLOBAL SHARED ASSETS & ITEM DATABASE
+-- ============================================================================
+local ItemList = {
+    "Planks", "Pizza", "Eoka", "Scrap", "Battery", "Molotov", "RustyHEPSHelmet", "CopperWiring", "Printed Circuit", "Bloxy cola", "HV Transformer", "Flashbang", "Cloth", "Microwave", "BearSpray", "WeldingMask", "GlassPane", "CompositeAlloyPlate", "Filament", "Mango"
+}
+
+-- Helper function to generate a human-readable list for dropdown titles
+local function getFormattedSelectionString(configTable)
+    local selected = {}
+    for item, state in pairs(configTable) do
+        if state then table.insert(selected, item) end
+    end
+    if #selected == 0 then return "None Chosen" end
+    table.sort(selected)
+    return table.concat(selected, ", ")
+end
+
+-- ============================================================================
+-- 6. SHOP FISH PANEL (Fishing Configuration with Multi-Select)
 -- ============================================================================
 local FishingConfigBox = Instance.new("Frame")
-FishingConfigBox.Size = UDim2.new(1, 0, 0, 180)
-FishingConfigBox.Position = UDim2.new(0, 0, 0, 105)
+FishingConfigBox.Size = UDim2.new(1, -10, 0, 180)
+FishingConfigBox.LayoutOrder = 3
 FishingConfigBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
 FishingConfigBox.BorderSizePixel = 0
 FishingConfigBox.Parent = MiscView
@@ -712,9 +846,8 @@ FishingTitle.TextSize = 13
 FishingTitle.BackgroundTransparency = 1
 FishingTitle.Parent = FishingConfigBox
 
--- Textbox 1: TARGET_TEXT
 local TargetTextLabel = Instance.new("TextLabel")
-TargetTextLabel.Text = "TARGET_TEXT:"
+TargetTextLabel.Text = "TARGET_ITEMS:"
 TargetTextLabel.Size = UDim2.new(0, 90, 0, 20)
 TargetTextLabel.Position = UDim2.new(0, 10, 0, 30)
 TargetTextLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
@@ -724,19 +857,81 @@ TargetTextLabel.TextSize = 12
 TargetTextLabel.BackgroundTransparency = 1
 TargetTextLabel.Parent = FishingConfigBox
 
-local TargetTextBox = Instance.new("TextBox")
-TargetTextBox.Size = UDim2.new(0, 200, 0, 22)
-TargetTextBox.Position = UDim2.new(0, 110, 0, 30)
-TargetTextBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-TargetTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-TargetTextBox.PlaceholderText = "Filament"
-TargetTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
-TargetTextBox.Text = "Filament"
-TargetTextBox.Font = Enum.Font.SourceSans
-TargetTextBox.TextSize = 12
-TargetTextBox.Parent = FishingConfigBox
+local TargetDropdownBtn = Instance.new("TextButton")
+TargetDropdownBtn.Size = UDim2.new(0, 200, 0, 22)
+TargetDropdownBtn.Position = UDim2.new(0, 110, 0, 30)
+TargetDropdownBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+TargetDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetDropdownBtn.Text = getFormattedSelectionString(SELECTED_FISHING_ITEMS)
+TargetDropdownBtn.Font = Enum.Font.SourceSans
+TargetDropdownBtn.TextSize = 11
+TargetDropdownBtn.ClipsDescendants = true
+TargetDropdownBtn.Parent = FishingConfigBox
 
--- Textbox 2: STAY_DURATION
+local FishingDropdownOpen = false
+local FishingDropdownMenu = nil
+
+local function createFishingDropdownMenu()
+    if FishingDropdownMenu then FishingDropdownMenu:Destroy() end
+    
+    FishingDropdownMenu = Instance.new("Frame")
+    FishingDropdownMenu.Size = UDim2.new(0, 200, 0, 200)
+    FishingDropdownMenu.Position = UDim2.new(0, 110, 0, 52)
+    FishingDropdownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    FishingDropdownMenu.BorderSizePixel = 1
+    FishingDropdownMenu.BorderColor3 = Color3.fromRGB(50, 50, 60)
+    FishingDropdownMenu.Parent = FishingConfigBox
+    FishingDropdownMenu.ZIndex = 100
+    
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    ScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    ScrollFrame.BackgroundTransparency = 1
+    ScrollFrame.BorderSizePixel = 0
+    ScrollFrame.ScrollBarThickness = 4
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #ItemList * 25)
+    ScrollFrame.Parent = FishingDropdownMenu
+    
+    for i, item in ipairs(ItemList) do
+        local ItemBtn = Instance.new("TextButton")
+        ItemBtn.Size = UDim2.new(1, 0, 0, 25)
+        ItemBtn.Position = UDim2.new(0, 0, 0, (i - 1) * 25)
+        ItemBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        ItemBtn.Font = Enum.Font.SourceSans
+        ItemBtn.TextSize = 11
+        ItemBtn.BorderSizePixel = 0
+        ItemBtn.Parent = ScrollFrame
+        ItemBtn.ZIndex = 101
+        
+        local function updateItemBtnVisual()
+            if SELECTED_FISHING_ITEMS[item] then
+                ItemBtn.Text = "✓ " .. item
+                ItemBtn.TextColor3 = Color3.fromRGB(80, 180, 100)
+            else
+                ItemBtn.Text = "  " .. item
+                ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+        updateItemBtnVisual()
+        
+        ItemBtn.MouseButton1Click:Connect(function()
+            SELECTED_FISHING_ITEMS[item] = not SELECTED_FISHING_ITEMS[item]
+            updateItemBtnVisual()
+            TargetDropdownBtn.Text = getFormattedSelectionString(SELECTED_FISHING_ITEMS)
+        end)
+    end
+end
+
+TargetDropdownBtn.MouseButton1Click:Connect(function()
+    FishingDropdownOpen = not FishingDropdownOpen
+    if FishingDropdownOpen then
+        createFishingDropdownMenu()
+        TargetDropdownBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    else
+        if FishingDropdownMenu then FishingDropdownMenu:Destroy() FishingDropdownMenu = nil end
+        TargetDropdownBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    end
+end)
+
 local StayDurationLabel = Instance.new("TextLabel")
 StayDurationLabel.Text = "STAY_DURATION:"
 StayDurationLabel.Size = UDim2.new(0, 90, 0, 20)
@@ -753,14 +948,11 @@ StayDurationBox.Size = UDim2.new(0, 200, 0, 22)
 StayDurationBox.Position = UDim2.new(0, 110, 0, 58)
 StayDurationBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 StayDurationBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-StayDurationBox.PlaceholderText = "1"
-StayDurationBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 StayDurationBox.Text = "1"
 StayDurationBox.Font = Enum.Font.SourceSans
 StayDurationBox.TextSize = 12
 StayDurationBox.Parent = FishingConfigBox
 
--- Textbox 3: SPAM_INTERVAL
 local SpamIntervalLabel = Instance.new("TextLabel")
 SpamIntervalLabel.Text = "SPAM_INTERVAL:"
 SpamIntervalLabel.Size = UDim2.new(0, 90, 0, 20)
@@ -777,14 +969,11 @@ SpamIntervalBox.Size = UDim2.new(0, 200, 0, 22)
 SpamIntervalBox.Position = UDim2.new(0, 110, 0, 86)
 SpamIntervalBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 SpamIntervalBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-SpamIntervalBox.PlaceholderText = "0.07"
-SpamIntervalBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 SpamIntervalBox.Text = "0.07"
 SpamIntervalBox.Font = Enum.Font.SourceSans
 SpamIntervalBox.TextSize = 12
 SpamIntervalBox.Parent = FishingConfigBox
 
--- Start Button
 local StartFishBtn = Instance.new("TextButton")
 StartFishBtn.Size = UDim2.new(0, 200, 0, 30)
 StartFishBtn.Position = UDim2.new(0, 10, 0, 114)
@@ -796,7 +985,6 @@ StartFishBtn.TextSize = 12
 StartFishBtn.BorderSizePixel = 0
 StartFishBtn.Parent = FishingConfigBox
 
--- Abort Instructions
 local AbortText = Instance.new("TextLabel")
 AbortText.Text = "Press N to Abort"
 AbortText.Size = UDim2.new(1, -20, 0, 20)
@@ -808,57 +996,43 @@ AbortText.TextSize = 11
 AbortText.BackgroundTransparency = 1
 AbortText.Parent = FishingConfigBox
 
--- Fishing script state
 local FishingActive = false
 local textConnection = nil
 local keyConnection = nil
 local isUnloaded = false
 local originalPosition = nil
 local isSpamming = false
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
--- Helper to safely get the current position of your character
 local function getMyPosition()
 	local character = LocalPlayer.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
 	return rootPart and rootPart.Position
 end
 
--- Teleport helper function
 local function teleportMe(position)
 	if not position then return end
 	local character = LocalPlayer.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-	if rootPart then
-		rootPart.CFrame = CFrame.new(position)
-	end
+	if rootPart then rootPart.CFrame = CFrame.new(position) end
 end
 
--- Cleanup function to return you back and fully unload the script
 local function unloadFishingScript(reason)
 	if isUnloaded then return end
 	isUnloaded = true
 	isSpamming = false
 	FishingActive = false
 	
-	-- Return to the original position before unloading
-	if originalPosition then
-		teleportMe(originalPosition)
-	end
-	
-	-- Disconnect listeners to prevent memory leaks
+	if originalPosition then teleportMe(originalPosition) end
 	if textConnection then textConnection:Disconnect() end
-	if keyConnection then keyConnection:Disconnect() end
 	
-	-- Reset button UI
 	StartFishBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
 	StartFishBtn.Text = "Start Shop Fish"
 	StartFishBtn.Active = true
 end
 
--- Key spamming loop function
 local function startSpamming(spamInterval)
 	isSpamming = true
-	
 	task.spawn(function()
 		while isSpamming and not isUnloaded do
 			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
@@ -869,13 +1043,10 @@ local function startSpamming(spamInterval)
 	end)
 end
 
--- Main fishing logic function
-local function checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+-- Updated multi-select evaluation logic for fishing engine
+local function checkShopText(STAY_DURATION, SPAM_INTERVAL)
 	if isUnloaded then return end
-	
-	if not originalPosition then
-		originalPosition = getMyPosition()
-	end
+	if not originalPosition then originalPosition = getMyPosition() end
 	
 	local prompt = workspace:WaitForChild("Interactables")
 	                        :WaitForChild("HoboStore")
@@ -883,11 +1054,11 @@ local function checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
 	                        :WaitForChild("Attachment")
 	                        :WaitForChild("Prompt")
 	
-	-- Teleport Coordinates
 	local MATCH_POS = Vector3.new(59, -21, 4)
 	local NO_MATCH_POS = Vector3.new(-11, 3, 55)
 	
-	if prompt.ObjectText == TARGET_TEXT then
+	-- Checks if current item matches ANY value configured in multi-select table
+	if SELECTED_FISHING_ITEMS[prompt.ObjectText] == true then
 		teleportMe(MATCH_POS)
 		startSpamming(SPAM_INTERVAL)
 		task.wait(STAY_DURATION)
@@ -909,12 +1080,9 @@ StartFishBtn.MouseButton1Click:Connect(function()
 	StartFishBtn.Text = "Fishing..."
 	StartFishBtn.Active = false
 	
-	-- Get values from textboxes
-	local TARGET_TEXT = TargetTextBox.Text ~= "" and TargetTextBox.Text or "Filament"
 	local STAY_DURATION = tonumber(StayDurationBox.Text) or 1
 	local SPAM_INTERVAL = tonumber(SpamIntervalBox.Text) or 0.07
 	
-	-- Listen for changes to ObjectText
 	local prompt = workspace:WaitForChild("Interactables")
 	                        :WaitForChild("HoboStore")
 	                        :WaitForChild("BuyButton")
@@ -922,19 +1090,459 @@ StartFishBtn.MouseButton1Click:Connect(function()
 	                        :WaitForChild("Prompt")
 	
 	textConnection = prompt:GetPropertyChangedSignal("ObjectText"):Connect(function()
-		checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+		checkShopText(STAY_DURATION, SPAM_INTERVAL)
 	end)
 	
-	-- Run initial check immediately upon start
-	checkShopText(TARGET_TEXT, STAY_DURATION, SPAM_INTERVAL)
+	checkShopText(STAY_DURATION, SPAM_INTERVAL)
 end)
 
--- Abort fishing with N key
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService2 = game:GetService("UserInputService")
 UserInputService2.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.N and FishingActive then
 		unloadFishingScript("User pressed 'N' key")
 	end
+end)
+
+-- ============================================================================
+-- INSTANT PROXIMITY PROMPTS TOGGLE
+-- ============================================================================
+local InstantPPToggleBox = Instance.new("Frame")
+InstantPPToggleBox.Size = UDim2.new(1, -10, 0, 45)
+InstantPPToggleBox.LayoutOrder = 4
+InstantPPToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+InstantPPToggleBox.BorderSizePixel = 0
+InstantPPToggleBox.Parent = MiscView
+
+local InstantPPTitle = Instance.new("TextLabel")
+InstantPPTitle.Text = "  Instant Proximity Prompts"
+InstantPPTitle.Size = UDim2.new(0, 180, 1, 0)
+InstantPPTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+InstantPPTitle.TextXAlignment = Enum.TextXAlignment.Left
+InstantPPTitle.Font = Enum.Font.SourceSansBold
+InstantPPTitle.TextSize = 14
+InstantPPTitle.BackgroundTransparency = 1
+InstantPPTitle.Parent = InstantPPToggleBox
+
+local InstantPPBtn = Instance.new("TextButton")
+InstantPPBtn.Size = UDim2.new(0, 65, 0, 28)
+InstantPPBtn.Position = UDim2.new(1, -75, 0.5, -14)
+InstantPPBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+InstantPPBtn.Text = "OFF"
+InstantPPBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+InstantPPBtn.Font = Enum.Font.SourceSansBold
+InstantPPBtn.TextSize = 12
+InstantPPBtn.Parent = InstantPPToggleBox
+
+local InstantPPActive = false
+local PromptButtonHoldBegan = nil
+
+InstantPPBtn.MouseButton1Click:Connect(function()
+    InstantPPActive = not InstantPPActive
+    
+    if InstantPPActive then
+        if fireproximityprompt then
+            if PromptButtonHoldBegan ~= nil then PromptButtonHoldBegan:Disconnect() end
+            
+            local ProximityPromptService = game:GetService("ProximityPromptService")
+            PromptButtonHoldBegan = ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+                fireproximityprompt(prompt)
+            end)
+            
+            InstantPPBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+            InstantPPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            InstantPPBtn.Text = "ON"
+        else
+            InstantPPActive = false
+        end
+    else
+        if PromptButtonHoldBegan ~= nil then PromptButtonHoldBegan:Disconnect() PromptButtonHoldBegan = nil end
+        InstantPPBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        InstantPPBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        InstantPPBtn.Text = "OFF"
+    end
+end)
+
+-- ============================================================================
+-- SHOP ITEM NOTIFICATION SYSTEM (With Multi-Select Compatibility)
+-- ============================================================================
+local NotificationToggleBox = Instance.new("Frame")
+NotificationToggleBox.Size = UDim2.new(1, -10, 0, 45)
+NotificationToggleBox.LayoutOrder = 5
+NotificationToggleBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+NotificationToggleBox.BorderSizePixel = 0
+NotificationToggleBox.Parent = MiscView
+
+local NotificationTitle = Instance.new("TextLabel")
+NotificationTitle.Text = "  Shop Item Notifications"
+NotificationTitle.Size = UDim2.new(0, 180, 1, 0)
+NotificationTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+NotificationTitle.TextXAlignment = Enum.TextXAlignment.Left
+NotificationTitle.Font = Enum.Font.SourceSansBold
+NotificationTitle.TextSize = 14
+NotificationTitle.BackgroundTransparency = 1
+NotificationTitle.Parent = NotificationToggleBox
+
+local NotificationBtn = Instance.new("TextButton")
+NotificationBtn.Size = UDim2.new(0, 65, 0, 28)
+NotificationBtn.Position = UDim2.new(1, -75, 0.5, -14)
+NotificationBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+NotificationBtn.Text = "OFF"
+NotificationBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+NotificationBtn.Font = Enum.Font.SourceSansBold
+NotificationBtn.TextSize = 12
+NotificationBtn.Parent = NotificationToggleBox
+
+local NotificationConfigBox = Instance.new("Frame")
+NotificationConfigBox.Size = UDim2.new(1, -10, 0, 220)
+NotificationConfigBox.LayoutOrder = 6
+NotificationConfigBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+NotificationConfigBox.BorderSizePixel = 0
+NotificationConfigBox.Parent = MiscView
+
+local NotificationConfigTitle = Instance.new("TextLabel")
+NotificationConfigTitle.Text = "  Notification Settings"
+NotificationConfigTitle.Size = UDim2.new(1, 0, 0, 25)
+NotificationConfigTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+NotificationConfigTitle.TextXAlignment = Enum.TextXAlignment.Left
+NotificationConfigTitle.Font = Enum.Font.SourceSansBold
+NotificationConfigTitle.TextSize = 13
+NotificationConfigTitle.BackgroundTransparency = 1
+NotificationConfigTitle.Parent = NotificationConfigBox
+
+local NotifTargetLabel = Instance.new("TextLabel")
+NotifTargetLabel.Text = "TARGET_ITEMS:"
+NotifTargetLabel.Size = UDim2.new(0, 90, 0, 20)
+NotifTargetLabel.Position = UDim2.new(0, 10, 0, 30)
+NotifTargetLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+NotifTargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+NotifTargetLabel.Font = Enum.Font.SourceSans
+NotifTargetLabel.TextSize = 12
+NotifTargetLabel.BackgroundTransparency = 1
+NotifTargetLabel.Parent = NotificationConfigBox
+
+local NotifTargetBtn = Instance.new("TextButton")
+NotifTargetBtn.Size = UDim2.new(0, 200, 0, 22)
+NotifTargetBtn.Position = UDim2.new(0, 110, 0, 30)
+NotifTargetBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+NotifTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NotifTargetBtn.Text = getFormattedSelectionString(SELECTED_NOTIF_ITEMS)
+NotifTargetBtn.Font = Enum.Font.SourceSans
+NotifTargetBtn.TextSize = 11
+NotifTargetBtn.ClipsDescendants = true
+NotifTargetBtn.Parent = NotificationConfigBox
+
+local NotifDropdownOpen = false
+local NotifDropdownMenu = nil
+
+local function createNotifDropdownMenu()
+    if NotifDropdownMenu then NotifDropdownMenu:Destroy() end
+    
+    NotifDropdownMenu = Instance.new("Frame")
+    NotifDropdownMenu.Size = UDim2.new(0, 200, 0, 200)
+    NotifDropdownMenu.Position = UDim2.new(0, 110, 0, 52)
+    NotifDropdownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    NotifDropdownMenu.BorderSizePixel = 1
+    NotifDropdownMenu.BorderColor3 = Color3.fromRGB(50, 50, 60)
+    NotifDropdownMenu.Parent = NotificationConfigBox
+    NotifDropdownMenu.ZIndex = 100
+    
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    ScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    ScrollFrame.BackgroundTransparency = 1
+    ScrollFrame.BorderSizePixel = 0
+    ScrollFrame.ScrollBarThickness = 4
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #ItemList * 25)
+    ScrollFrame.Parent = NotifDropdownMenu
+    
+    for i, item in ipairs(ItemList) do
+        local ItemBtn = Instance.new("TextButton")
+        ItemBtn.Size = UDim2.new(1, 0, 0, 25)
+        ItemBtn.Position = UDim2.new(0, 0, 0, (i - 1) * 25)
+        ItemBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        ItemBtn.Font = Enum.Font.SourceSans
+        ItemBtn.TextSize = 11
+        ItemBtn.BorderSizePixel = 0
+        ItemBtn.Parent = ScrollFrame
+        ItemBtn.ZIndex = 101
+        
+        local function updateNotifBtnVisual()
+            if SELECTED_NOTIF_ITEMS[item] then
+                ItemBtn.Text = "✓ " .. item
+                ItemBtn.TextColor3 = Color3.fromRGB(80, 180, 100)
+            else
+                ItemBtn.Text = "  " .. item
+                ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+        updateNotifBtnVisual()
+        
+        ItemBtn.MouseButton1Click:Connect(function()
+            SELECTED_NOTIF_ITEMS[item] = not SELECTED_NOTIF_ITEMS[item]
+            updateNotifBtnVisual()
+            NotifTargetBtn.Text = getFormattedSelectionString(SELECTED_NOTIF_ITEMS)
+        end)
+    end
+end
+
+NotifTargetBtn.MouseButton1Click:Connect(function()
+    NotifDropdownOpen = not NotifDropdownOpen
+    if NotifDropdownOpen then
+        createNotifDropdownMenu()
+        NotifTargetBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    else
+        if NotifDropdownMenu then NotifDropdownMenu:Destroy() NotifDropdownMenu = nil end
+        NotifTargetBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    end
+end)
+
+local SoundIDLabel = Instance.new("TextLabel")
+SoundIDLabel.Text = "SOUND_ID:"
+SoundIDLabel.Size = UDim2.new(0, 90, 0, 20)
+SoundIDLabel.Position = UDim2.new(0, 10, 0, 58)
+SoundIDLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+SoundIDLabel.TextXAlignment = Enum.TextXAlignment.Left
+SoundIDLabel.Font = Enum.Font.SourceSans
+SoundIDLabel.TextSize = 12
+SoundIDLabel.BackgroundTransparency = 1
+SoundIDLabel.Parent = NotificationConfigBox
+
+local SoundIDBox = Instance.new("TextBox")
+SoundIDBox.Size = UDim2.new(0, 200, 0, 22)
+SoundIDBox.Position = UDim2.new(0, 110, 0, 58)
+SoundIDBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+SoundIDBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+SoundIDBox.Text = "rbxassetid://6062677321"
+SoundIDBox.Font = Enum.Font.SourceSans
+SoundIDBox.TextSize = 12
+SoundIDBox.Parent = NotificationConfigBox
+
+local CheckIntervalLabel = Instance.new("TextLabel")
+CheckIntervalLabel.Text = "CHECK_INTERVAL:"
+CheckIntervalLabel.Size = UDim2.new(0, 90, 0, 20)
+CheckIntervalLabel.Position = UDim2.new(0, 10, 0, 86)
+CheckIntervalLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+CheckIntervalLabel.TextXAlignment = Enum.TextXAlignment.Left
+CheckIntervalLabel.Font = Enum.Font.SourceSans
+CheckIntervalLabel.TextSize = 12
+CheckIntervalLabel.BackgroundTransparency = 1
+CheckIntervalLabel.Parent = NotificationConfigBox
+
+local CheckIntervalBox = Instance.new("TextBox")
+CheckIntervalBox.Size = UDim2.new(0, 200, 0, 22)
+CheckIntervalBox.Position = UDim2.new(0, 110, 0, 86)
+CheckIntervalBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+CheckIntervalBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+CheckIntervalBox.Text = "0.5"
+CheckIntervalBox.Font = Enum.Font.SourceSans
+CheckIntervalBox.TextSize = 12
+CheckIntervalBox.Parent = NotificationConfigBox
+
+local NotificationActive = false
+local NotificationConnection = nil
+
+local NotificationUI = Instance.new("Frame")
+NotificationUI.Name = "NotificationUI"
+NotificationUI.Size = UDim2.new(0, 300, 0, 70)
+NotificationUI.Position = UDim2.new(1, -320, 1, -90)
+NotificationUI.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+NotificationUI.BorderColor3 = Color3.fromRGB(80, 180, 100)
+NotificationUI.BorderSizePixel = 2
+NotificationUI.Visible = false
+NotificationUI.Parent = ScreenGui
+
+local NotificationText = Instance.new("TextLabel")
+NotificationText.Text = "Target Shop Item Found"
+NotificationText.Size = UDim2.new(1, -10, 0.5, -5)
+NotificationText.Position = UDim2.new(0, 5, 0, 5)
+NotificationText.TextColor3 = Color3.fromRGB(80, 180, 100)
+NotificationText.Font = Enum.Font.SourceSansBold
+NotificationText.TextSize = 14
+NotificationText.BackgroundTransparency = 1
+NotificationText.TextWrapped = true
+NotificationText.Parent = NotificationUI
+
+local ItemNameText = Instance.new("TextLabel")
+ItemNameText.Text = "Item: None"
+ItemNameText.Size = UDim2.new(1, -10, 0.5, -5)
+ItemNameText.Position = UDim2.new(0, 5, 0.5, 5)
+ItemNameText.TextColor3 = Color3.fromRGB(200, 200, 200)
+ItemNameText.Font = Enum.Font.SourceSans
+ItemNameText.TextSize = 12
+ItemNameText.BackgroundTransparency = 1
+ItemNameText.Parent = NotificationUI
+
+local lastNotifiedItem = ""
+local lastNotifiedTime = 0
+
+local function showNotification(itemName)
+    -- Added rate limiting so it won't repeatedly spam notifications if the item stays unchanged
+    if itemName == lastNotifiedItem and (os.clock() - lastNotifiedTime) < 5 then return end
+    lastNotifiedItem = itemName
+    lastNotifiedTime = os.clock()
+
+    ItemNameText.Text = "Item: " .. itemName
+    NotificationUI.Visible = true
+    
+    if SoundIDBox.Text ~= "" then
+        local sound = Instance.new("Sound")
+        sound.SoundId = SoundIDBox.Text
+        sound.Volume = 0.5
+        sound.Parent = ScreenGui
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 2)
+    end
+    
+    task.spawn(function()
+        task.wait(3)
+        if lastNotifiedItem == itemName then
+            NotificationUI.Visible = false
+        end
+    end)
+end
+
+NotificationBtn.MouseButton1Click:Connect(function()
+    NotificationActive = not NotificationActive
+    
+    if NotificationActive then
+        local checkInterval = tonumber(CheckIntervalBox.Text) or 0.5
+        NotificationBtn.BackgroundColor3 = Color3.fromRGB(80, 180, 100)
+        NotificationBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NotificationBtn.Text = "ON"
+        
+        if NotificationConnection then NotificationConnection:Disconnect() end
+        
+        NotificationConnection = task.spawn(function()
+            while NotificationActive do
+                local prompt = workspace:FindFirstChild("Interactables")
+                if prompt then
+                    prompt = prompt:FindFirstChild("HoboStore")
+                    if prompt then
+                        prompt = prompt:FindFirstChild("BuyButton")
+                        if prompt then
+                            prompt = prompt:FindFirstChild("Attachment")
+                            if prompt then
+                                prompt = prompt:FindFirstChild("Prompt")
+                            end
+                        end
+                    end
+                end
+                
+                -- Evaluates live whether the current store item exists inside the multi-select database
+                if prompt and SELECTED_NOTIF_ITEMS[prompt.ObjectText] == true then
+                    showNotification(prompt.ObjectText)
+                end
+                
+                task.wait(checkInterval)
+            end
+        end)
+    else
+        NotificationBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        NotificationBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        NotificationBtn.Text = "OFF"
+        
+        if NotificationConnection then
+            NotificationConnection:Disconnect()
+            NotificationConnection = nil
+        end
+    end
+end)
+local CheckOutBox = Instance.new("Frame")
+CheckOutBox.Size = UDim2.new(1, -10, 0, 85) -- Tall enough for both text box and run button
+CheckOutBox.LayoutOrder = 2
+CheckOutBox.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+CheckOutBox.BorderSizePixel = 0
+CheckOutBox.Parent = MiscView
+
+local CheckOutTitle = Instance.new("TextLabel")
+CheckOutTitle.Text = "  Check this out"
+CheckOutTitle.Size = UDim2.new(0, 180, 0, 40)
+CheckOutTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+CheckOutTitle.TextXAlignment = Enum.TextXAlignment.Left
+CheckOutTitle.Font = Enum.Font.SourceSansBold
+CheckOutTitle.TextSize = 14
+CheckOutTitle.BackgroundTransparency = 1
+CheckOutTitle.Parent = CheckOutBox
+
+local CheckOutBtn = Instance.new("TextButton")
+CheckOutBtn.Size = UDim2.new(0, 85, 0, 28)
+CheckOutBtn.Position = UDim2.new(1, -95, 0, 6)
+CheckOutBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+CheckOutBtn.Text = "RUN"
+CheckOutBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CheckOutBtn.Font = Enum.Font.SourceSansBold
+CheckOutBtn.TextSize = 12
+CheckOutBtn.Parent = CheckOutBox
+
+local LoopInputFrame = Instance.new("Frame")
+LoopInputFrame.Size = UDim2.new(1, -20, 0, 32)
+LoopInputFrame.Position = UDim2.new(0, 10, 0, 45)
+LoopInputFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+LoopInputFrame.BorderSizePixel = 0
+LoopInputFrame.Parent = CheckOutBox
+
+local LoopTextBox = Instance.new("TextBox")
+LoopTextBox.Size = UDim2.new(1, 0, 1, 0)
+LoopTextBox.BackgroundTransparency = 1
+LoopTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoopTextBox.PlaceholderText = "Enter spam amount (e.g. 10)..."
+LoopTextBox.PlaceholderColor3 = Color3.fromRGB(110, 110, 120)
+LoopTextBox.Text = "10" -- Standard default value
+LoopTextBox.Font = Enum.Font.SourceSans
+LoopTextBox.TextSize = 13
+LoopTextBox.Parent = LoopInputFrame
+
+CheckOutBtn.MouseButton1Click:Connect(function()
+    local spamAmount = tonumber(LoopTextBox.Text) or 10 -- Fallbacks safely to 10 if input isn't a valid number
+    
+    task.spawn(function()
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+
+        -- Function to toggle noclip
+        local noclipConnection
+        local function setNoclip(enabled)
+            if enabled then
+                noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+                    if character then
+                        for _, part in pairs(character:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end)
+            else
+                if noclipConnection then
+                    noclipConnection:Disconnect()
+                    noclipConnection = nil
+                end
+                if hrp then hrp.CanCollide = true end
+            end
+        end
+
+        -- 1. Enable Noclip and Teleport to the first location
+        setNoclip(true)
+        hrp.CFrame = CFrame.new(0, -7, 0)
+        task.wait(0.2)
+
+        -- 2. Spam the ProximityPrompt based on TextBox entry
+        for i = 1, spamAmount do 
+            if fireproximityprompt then 
+                local prompt = workspace["The Demoncore"].Screwdriver.Base.Attachment:FindFirstChild("Interact") 
+                if prompt and prompt:IsA("ProximityPrompt") then 
+                    fireproximityprompt(prompt) 
+                else 
+                    print("ProximityPrompt 'Interact' not found at the specified path.") 
+                end 
+            else 
+                print("Incompatible Exploit: missing fireproximityprompt") 
+            end 
+            task.wait(0) 
+        end
+
+        -- 3. Disable Noclip and Teleport to the final location
+        setNoclip(false)
+        hrp.CFrame = CFrame.new(-10, 3, 55)
+    end)
 end)
