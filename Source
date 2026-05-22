@@ -981,7 +981,7 @@ StartFishBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
 StartFishBtn.Text = "Start Shop Fish (Recommended To Enable Instant Proximity Prompts)"
 StartFishBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 StartFishBtn.Font = Enum.Font.SourceSansBold
-StartFishBtn.TextSize = 12
+StartFishBtn.TextSize = 8
 StartFishBtn.BorderSizePixel = 0
 StartFishBtn.Parent = FishingConfigBox
 
